@@ -3,19 +3,19 @@ import requests
 import json
 import io
 
-st.set_page_config(page_title="AI Resume Rebuilder Frontend", layout="wide")
-
-st.title("AI Resume Rebuilder — Streamlit Frontend")
-
-BACKEND_DEFAULT = "http://localhost:8000"
-backend_url = st.text_input("Backend URL", BACKEND_DEFAULT)
-
-import streamlit as st
-import requests
-import json
-import io
-
 st.set_page_config(page_title="AI Resume Rebuilder", layout="wide")
+
+# Fixed backend URL (not editable in UI for normal users)
+backend_url = "http://localhost:8000"
+
+# Restore session token from URL query parameters on app load
+query_params = st.experimental_get_query_params()
+if "token" in query_params:
+    st.session_state.token = query_params["token"][0]
+
+# If a token exists in session_state, persist it to the URL
+if st.session_state.get("token"):
+    st.experimental_set_query_params(token=st.session_state.token)
 
 def _init_state():
     for key, val in {
@@ -26,29 +26,147 @@ def _init_state():
     }.items():
         if key not in st.session_state:
             st.session_state[key] = val
+    # session token storage
+    if 'session_token' not in st.session_state:
+        st.session_state['session_token'] = None
+    # ensure we only attempt auto-create once per user entrance
+    if 'session_initialized' not in st.session_state:
+        st.session_state['session_initialized'] = False
 
 
 _init_state()
 
+# Persist session token into query params if available, so reloads keep the same token
+if st.session_state.get('session_token'):
+    st.experimental_set_query_params(token=st.session_state['session_token'])
+
+# Attempt to restore session token from query params on load
+try:
+    q = st.experimental_get_query_params()
+    qtoken = q.get('token', [None])[0]
+    if qtoken and not st.session_state.get('session_token'):
+        st.session_state['session_token'] = qtoken
+        try:
+            headers = {'Authorization': f"Bearer {qtoken}"}
+            resp = requests.get(f"{backend_url}/session-info", headers=headers, timeout=5)
+            if resp.status_code == 200:
+                st.session_state['session_info'] = resp.json()
+        except Exception:
+            pass
+except Exception:
+    pass
+
+def _create_initial_session_if_missing():
+    """Try to create a demo session once when the user first opens the app.
+
+    This avoids the problem where the first protected call runs before a session exists.
+    If the backend is unreachable we mark initialization done so we don't spam requests.
+    """
+    if st.session_state.get('session_token'):
+        st.session_state['session_initialized'] = True
+        return
+    if st.session_state.get('session_initialized'):
+        return
+    try:
+        # short timeout so page load isn't blocked for long if backend down
+        # request a larger demo quota so new users won't exhaust the session immediately
+        sresp = requests.post(f"{backend_url}/session", data={'ttl_minutes': 60, 'max_uses': 4}, timeout=4)
+        if sresp.status_code == 200:
+            st.session_state['session_token'] = sresp.json().get('token')
+            # fetch authoritative session info (uses / remaining) and store it
+            try:
+                info = fetch_session_info()
+                if info:
+                    st.session_state['session_info'] = info
+            except Exception:
+                pass
+    except Exception:
+        # ignore errors here; we just don't have a session yet
+        pass
+    finally:
+        # mark initialized (whether success or not) to avoid repeated attempts
+        st.session_state['session_initialized'] = True
+
+
+# ensure a demo session exists immediately on first open
+# Restore token from query params if present so refreshes keep the same session
+try:
+    q = st.st.query_params()
+    qtoken = q.get('token', [None])[0]
+    if qtoken and not st.session_state.get('session_token'):
+        st.session_state['session_token'] = qtoken
+        # try to fetch authoritative session info
+        try:
+            info = None
+            info = requests.get(f"{backend_url}/session-info", headers={'Authorization': f"Bearer {qtoken}"}, timeout=5)
+            if info and info.status_code == 200:
+                st.session_state['session_info'] = info.json()
+        except Exception:
+            pass
+except Exception:
+    pass
+
+# Now attempt auto-create if we still don't have a token
+_create_initial_session_if_missing()
+
 # Sidebar: settings for non-developers
 st.sidebar.title("Settings")
-st.sidebar.markdown("Enter the URL where the FastAPI backend is running and an optional API token.")
-BACKEND_DEFAULT = "http://localhost:8000"
-backend_url = st.sidebar.text_input("Backend URL", BACKEND_DEFAULT)
-api_token = st.sidebar.text_input("API token (optional)", type="password")
+st.sidebar.markdown("Paste an admin token below if you have one. Normal users don't need to change backend settings.")
 st.sidebar.markdown("---")
 st.sidebar.markdown("Steps: 1) Upload PDF → 2) Review/Edit → 3) Tailor (optional) → 4) Generate PDF")
 
 
 def _headers():
     h = {}
-    if api_token:
-        h['Authorization'] = api_token
+    # Use session token (Bearer) if available
+    if st.session_state.get('session_token'):
+        h['Authorization'] = f"Bearer {st.session_state['session_token']}"
     return h
 
 
 st.title("AI Resume Rebuilder — Easy Mode")
 st.markdown("A simple, step-by-step interface to extract, review, tailor, and generate ATS-friendly resumes. Follow the steps below.")
+
+# Helper to fetch session info from backend and store in session_state
+def fetch_session_info():
+    token = st.session_state.get('session_token')
+    if not token:
+        return None
+    try:
+        headers = {'Authorization': f"Bearer {token}"}
+        resp = requests.get(f"{backend_url}/session-info", headers=headers, timeout=5)
+        if resp.status_code == 200:
+            info = resp.json()
+            st.session_state['session_info'] = info
+            return info
+    except Exception:
+        return None
+    return None
+
+# Display current session usage if available
+session_info = st.session_state.get('session_info') or fetch_session_info()
+
+# Show a transient toast message if set by actions (extraction/tailor/generate)
+# Toast placeholder: display one-off messages set by actions
+toast_ph = st.empty()
+if st.session_state.get('toast_msg'):
+    try:
+        msg = st.session_state.pop('toast_msg')
+        toast_ph.success(msg)
+    except Exception:
+        st.session_state.pop('toast_msg', None)
+
+if session_info:
+    uses = session_info.get('uses')
+    max_uses = session_info.get('max_uses')
+    remaining = session_info.get('remaining')
+    st.info(f"Session uses: {uses}/{max_uses} — {remaining} remaining")
+    if st.button("Refresh session info", key='refresh_session'):
+        new_info = fetch_session_info()
+        if new_info:
+            st.success("Session info updated")
+        else:
+            st.error("Could not refresh session info")
 
 
 ## Step 1: Upload and extract
@@ -57,31 +175,65 @@ st.info("Upload a clean PDF of your resume. The app will extract text and try to
 uploaded_file = st.file_uploader("Choose a PDF file to upload", type=["pdf"]) 
 
 if uploaded_file is not None:
-    # size check
+    # Show file info but do NOT auto-run extraction — require explicit user action
     try:
         size_mb = uploaded_file.size / (1024*1024)
     except Exception:
         size_mb = None
+    st.markdown(f"**Selected file:** {uploaded_file.name} ({size_mb:.2f} MB)" if size_mb else f"**Selected file:** {uploaded_file.name}")
     if size_mb and size_mb > 10:
         st.warning("File is larger than 10 MB — extraction may take longer or fail.")
-    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
-    try:
-        with st.spinner("Uploading and extracting — this may take a moment..."):
-            resp = requests.post(f"{backend_url}/extract-cv-json/", files=files, headers=_headers(), timeout=180)
-        if resp.status_code == 200:
-            data = resp.json()
-            structured = data.get("structured_data")
-            original_contact = data.get("original_contact")
-            extracted = data.get("extracted_text")
-            st.success("Extraction complete")
-            st.session_state['extracted_preview'] = extracted[:2000] if extracted else None
-            # populate editable text areas in session state
-            st.session_state['structured_text'] = json.dumps(structured, indent=2) if structured else None
-            st.session_state['original_text'] = json.dumps(original_contact or {}, indent=2)
-        else:
-            st.error(f"Extraction failed: {resp.status_code} {resp.text}")
-    except Exception as e:
-        st.error(f"Error calling backend: {e}")
+
+    if st.button("Extract and parse", key='extract_button'):
+        # Ensure we have a session token before calling model-backed endpoints so the server can increment usage
+        if not st.session_state.get('session_token'):
+            try:
+                sresp = requests.post(f"{backend_url}/session", data={'ttl_minutes': 60, 'max_uses': 100}, timeout=10)
+                if sresp.status_code == 200:
+                    st.session_state['session_token'] = sresp.json().get('token')
+                    # Persist token in URL query params
+                    st.experimental_set_query_params(token=st.session_state['session_token'])
+                    # populate session info immediately
+                    try:
+                        info = fetch_session_info()
+                        if info:
+                            st.session_state['session_info'] = info
+                    except Exception:
+                        pass
+                    st.success("Demo session started (100 uses)")
+                else:
+                    st.info("Could not create demo session automatically; protected endpoints will require a token.")
+            except Exception:
+                st.info("Could not create demo session automatically; protected endpoints will require a token.")
+
+        files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
+        try:
+            with st.spinner("Uploading and extracting — this may take a moment..."):
+                resp = requests.post(f"{backend_url}/extract-cv-json/", files=files, headers=_headers(), timeout=180)
+            if resp.status_code == 200:
+                data = resp.json()
+                structured = data.get("structured_data")
+                original_contact = data.get("original_contact")
+                extracted = data.get("extracted_text")
+                st.success("Extraction complete")
+                st.session_state['extracted_preview'] = extracted[:2000] if extracted else None
+                # populate editable text areas in session state
+                st.session_state['structured_text'] = json.dumps(structured, indent=2) if structured else None
+                st.session_state['original_text'] = json.dumps(original_contact or {}, indent=2)
+
+                # The extraction call consumed a model prompt — refresh authoritative session info, set toast, and rerun
+                try:
+                    info = fetch_session_info()
+                    if info:
+                        st.session_state['session_info'] = info
+                        st.session_state['toast_msg'] = f"Session used: {info.get('uses')}/{info.get('max_uses')} — {info.get('remaining')} remaining"
+                        st.experimental_rerun()
+                except Exception:
+                    pass
+            else:
+                st.error(f"Extraction failed: {resp.status_code} {resp.text}")
+        except Exception as e:
+            st.error(f"Error calling backend: {e}")
 
 
 ## Step 2: Review and edit
@@ -160,6 +312,15 @@ if tailor_submit:
                     st.session_state['tailored_text'] = json.dumps(tailored, indent=2)
                     st.subheader("Tailored output (preview)")
                     st.json(tailored)
+                    # refresh session info so uses/max_uses reflect this call; show toast and rerun to update banner
+                    try:
+                        info = fetch_session_info()
+                        if info:
+                            st.session_state['session_info'] = info
+                            st.session_state['toast_msg'] = f"Session used: {info.get('uses')}/{info.get('max_uses')} — {info.get('remaining')} remaining"
+                            st.experimental_rerun()
+                    except Exception:
+                        pass
                 else:
                     st.error(f"Tailoring failed: {resp.status_code} {resp.text}")
             except Exception as e:
@@ -220,6 +381,7 @@ if gen_submit:
         try:
             with st.spinner("Generating PDF on server — this may take a moment..."):
                 resp = requests.post(f"{backend_url}/generate-final-cv/", data=payload, headers=_headers(), timeout=180)
+
             if resp.status_code == 200:
                 result = resp.json()
                 download_link = result.get('download_link')
@@ -235,6 +397,15 @@ if gen_submit:
                             st.info("Could not fetch PDF for inline download; use the download link above")
                     except Exception:
                         st.info("Could not fetch PDF for inline download; use the download link above")
+                    # refresh session info after generation
+                    try:
+                        info = fetch_session_info()
+                        if info:
+                            st.session_state['session_info'] = info
+                            st.session_state['toast_msg'] = f"Session used: {info.get('uses')}/{info.get('max_uses')} — {info.get('remaining')} remaining"
+                            st.experimental_rerun()
+                    except Exception:
+                        pass
                 else:
                     st.error(f"No download link returned: {result}")
             else:
@@ -244,12 +415,27 @@ if gen_submit:
 
 
 st.markdown("---")
-st.write("Backend URL used:", backend_url)
+#st.info("Tips: make sure your FastAPI server is running locally on http://localhost:8000. Install dependencies: streamlit, requests.")
 
-st.info("Tips: make sure your FastAPI server is running and reachable at the Backend URL. Install dependencies: streamlit, requests.")
-st.write("Backend URL used:", backend_url)
+# Session controls
+st.sidebar.markdown("---")
+st.sidebar.subheader("Session")
+# Admin helper: paste an admin token and activate it for this session
+admin_token_input = st.sidebar.text_input("Admin token (paste here)", type="password")
+if st.sidebar.button("Use admin token"):
+    if admin_token_input:
+        st.session_state['session_token'] = admin_token_input
+        st.experimental_set_query_params(token=st.session_state['session_token'])
+        # refresh session info into session_state
+        info = fetch_session_info()
+        if info and info.get('is_admin'):
+            st.sidebar.success("Admin session active — quota bypass enabled")
+        else:
+            st.sidebar.warning("Token set but not recognized as admin or session-info unavailable")
+    else:
+        st.sidebar.info("Paste an admin token first")
 
 
 
 # Helpful notes
-st.info("Tips: run your FastAPI server locally on http://localhost:8000 and then use this Streamlit app to interact with it. Install dependencies: streamlit, requests.")
+#st.info("Tips: run your FastAPI server locally on http://localhost:8000 and then use this Streamlit app to interact with it. Install dependencies: streamlit, requests.")

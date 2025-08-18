@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+date: Sun, 17 Aug 2025 23:51:43 GMT
+server: uvicorn
+content-length: 146
+content-type: application/json
+
+{"tailored_data":{"summary":"","skills_description":"","experience_description":"","education_description":"","name":"T"},"original_contact":null}
