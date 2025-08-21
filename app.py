@@ -102,7 +102,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Fixed backend URL (not editable in UI for normal users)
-backend_url = "https://3e1b4cdbb778d3.lhr.life"
+backend_url = "https://bf433d9c7f0897.lhr.life"
 
 # Restore session token from URL query parameters on app load
 query_params = st.query_params
