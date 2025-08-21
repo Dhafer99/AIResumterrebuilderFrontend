@@ -246,7 +246,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Fixed backend URL (not editable in UI for normal users)
-backend_url = "https://04c2a1a23e6c.ngrok-free.app"
+backend_url = "https://0d4e270e56ca.ngrok-free.app/"
 
 # Restore session token from URL query parameters on app load
 query_params = st.query_params
