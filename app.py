@@ -152,6 +152,35 @@ st.markdown("""
     
     /* FIX FOR BUTTON VISIBILITY ISSUES - DESKTOP AND MOBILE */
     
+    /* Credit usage information - ensure text is always visible with highest specificity */
+    .credit-usage-info, .credit-usage-info *, 
+    .credit-usage-info strong, .credit-usage-info em, 
+    .credit-usage-info br + text, .credit-usage-info text {
+        color: #333333 !important;
+    }
+    
+    /* Desktop AND Mobile override for credit usage - very specific and forceful */
+    .stApp .credit-usage-info,
+    .stApp .credit-usage-info *,
+    .stApp .credit-usage-info strong,
+    .stApp .credit-usage-info em,
+    .stApp .credit-usage-info div,
+    .stApp .credit-usage-info span {
+        color: #333333 !important;
+    }
+    
+    /* Mobile override for credit usage - very specific */
+    @media (max-width: 768px) {
+        .stApp .credit-usage-info,
+        .stApp .credit-usage-info *,
+        .stApp .credit-usage-info strong,
+        .stApp .credit-usage-info em,
+        .stApp .credit-usage-info div,
+        .stApp .credit-usage-info span {
+            color: #333333 !important;
+        }
+    }
+    
     /* Desktop button fixes */
     @media (min-width: 769px) {
         /* File uploader button */
@@ -459,7 +488,7 @@ if session_info:
         
         # Credit usage information
         st.markdown("""
-        <div style="background: #f8f9fa; border: 2px solid #667eea; padding: 1rem; border-radius: 8px; color: #333; margin: 0.5rem 0; font-size: 1.1em;">
+        <div class="credit-usage-info" style="background: #f8f9fa; border: 2px solid #667eea; padding: 1rem; border-radius: 8px; color: #333; margin: 0.5rem 0; font-size: 1.1em;">
             <strong style="color: #667eea;">💡 Credit Usage:</strong> Each AI-powered step consumes 1 credit:<br>
             • <strong>Step 1:</strong> Resume extraction & parsing (1 credit)<br>
             • <strong>Step 3:</strong> Job-specific tailoring (1 credit)<br>
