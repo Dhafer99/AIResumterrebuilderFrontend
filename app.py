@@ -2,27 +2,126 @@ import streamlit as st
 import requests
 import json
 import io
+import time
 
-st.set_page_config(page_title="AI Resume Rebuilder", layout="wide")
+# Professional page configuration
+st.set_page_config(
+    page_title="AI Resume Rebuilder | Professional ATS Optimization",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for professional styling
+st.markdown("""
+<style>
+    /* Hide Streamlit's top menu and footer */
+    #MainMenu {visibility: hidden;}
+    .stDeployButton {display:none;}
+    footer {visibility: hidden;}
+    #stDecoration {display:none;}
+    header {visibility: hidden;}
+    
+    .main-header {
+        background: linear-gradient(90de                                             if is_admin:
+                                st.info("🔑 **Admin Account**: You have unlimited usage!")
+                            else:
+                                if remaining > 0:
+                                    st.info(f"📊 **Usage Update**: You have **{remaining} uses remaining** out of {max_uses} total.")
+                                else:
+                                    st.warning("⚠️ **Usage Limit Reached**: You've used all your free attempts. Contact the developer below for premium access!")
+                            
+                            # Show immediate toast notification
+                            st.toast(f"🎯 Step 1 Complete! {uses}/{max_uses} uses consumed", icon="✅")
+                            st.session_state['toast_msg'] = f"🎯 Step 1 Complete! Session: {info.get('uses')}/{info.get('max_uses')} used"info:
+                            st.session_state['session_info'] = info
+                            st.session_state['toast_msg'] = f"🎯 Step 1 Complete! Session: {info.get('uses')}/{info.get('max_uses')} used"
+                            st.rerun()667eea 0%, #764ba2 100%);
+        padding: 2rem 0;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        text-align: center;
+        color: white;
+    }
+    .step-header {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        color: white;
+        font-weight: bold;
+        margin: 1rem 0;
+    }
+    .progress-bar {
+        height: 20px;
+        background-color: #e0e0e0;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 1rem 0;
+    }
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.3s ease;
+    }
+    .stats-card {h
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        margin: 0.5rem 0;
+        
+    }
+    .feature-highlight {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        color: white;
+        margin: 1rem 0;
+    }
+    .success-message {
+        background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        color: white;
+        font-weight: bold;
+    }
+    .sidebar .sidebar-content {
+        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Professional header
+st.markdown("""
+<div class="main-header">
+    <h1>🤖 AI Resume Rebuilder</h1>
+    <h3>Professional ATS-Optimized Resume Generation</h3>
+    <p>Transform your resume with AI-powered analysis and optimization</p>
+</div>
+""", unsafe_allow_html=True)
 
 # Fixed backend URL (not editable in UI for normal users)
-backend_url = "http://localhost:8000"
+backend_url = "https://3e1b4cdbb778d3.lhr.life"
 
 # Restore session token from URL query parameters on app load
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 if "token" in query_params:
-    st.session_state.token = query_params["token"][0]
+    st.session_state.token = query_params["token"]
 
 # If a token exists in session_state, persist it to the URL
 if st.session_state.get("token"):
-    st.experimental_set_query_params(token=st.session_state.token)
+    st.query_params["token"] = st.session_state.token
 
 def _init_state():
+    """Initialize session state with professional progress tracking"""
     for key, val in {
         'structured_text': None,
         'original_text': None,
         'tailored_text': None,
-        'extracted_preview': None
+        'extracted_preview': None,
+        'step_completed': {1: False, 2: False, 3: False, 4: False},
+        'progress_percentage': 0
     }.items():
         if key not in st.session_state:
             st.session_state[key] = val
@@ -33,17 +132,34 @@ def _init_state():
     if 'session_initialized' not in st.session_state:
         st.session_state['session_initialized'] = False
 
+def update_progress():
+    """Update progress based on completed steps"""
+    completed_steps = sum(1 for completed in st.session_state['step_completed'].values() if completed)
+    st.session_state['progress_percentage'] = (completed_steps / 4) * 100
+
+def show_progress_bar():
+    """Display professional progress bar"""
+    progress = st.session_state.get('progress_percentage', 0)
+    st.markdown(f"""
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: {progress}%"></div>
+    </div>
+    <p style="text-align: center; color: #666; font-size: 0.9em;">
+        Progress: {progress:.0f}% Complete • Step {sum(1 for completed in st.session_state['step_completed'].values() if completed)} of 4
+    </p>
+    """, unsafe_allow_html=True)
+
 
 _init_state()
 
 # Persist session token into query params if available, so reloads keep the same token
 if st.session_state.get('session_token'):
-    st.experimental_set_query_params(token=st.session_state['session_token'])
+    st.query_params["token"] = st.session_state['session_token']
 
 # Attempt to restore session token from query params on load
 try:
-    q = st.experimental_get_query_params()
-    qtoken = q.get('token', [None])[0]
+    q = st.query_params
+    qtoken = q.get('token')
     if qtoken and not st.session_state.get('session_token'):
         st.session_state['session_token'] = qtoken
         try:
@@ -109,11 +225,32 @@ except Exception:
 # Now attempt auto-create if we still don't have a token
 _create_initial_session_if_missing()
 
-# Sidebar: settings for non-developers
-st.sidebar.title("Settings")
-st.sidebar.markdown("Paste an admin token below if you have one. Normal users don't need to change backend settings.")
+# Professional sidebar with enhanced information
+st.sidebar.markdown("""
+<div style="background: linear-gradient(180deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 10px; color: white; margin-bottom: 1rem;">
+    <h2 style="color: white; text-align: center;">⚙️ Control Panel</h2>
+</div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("### 🎯 How it Works")
+st.sidebar.markdown("""
+**Step 1:** Upload your PDF resume  
+**Step 2:** Review extracted data  
+**Step 3:** Tailor to job (optional)  
+**Step 4:** Generate optimized PDF  
+""")
+
 st.sidebar.markdown("---")
-st.sidebar.markdown("Steps: 1) Upload PDF → 2) Review/Edit → 3) Tailor (optional) → 4) Generate PDF")
+st.sidebar.markdown("### 📊 Features")
+st.sidebar.markdown("""
+✅ AI-powered text extraction  
+✅ ATS compatibility analysis  
+✅ Job-specific tailoring  
+✅ Professional PDF generation  
+✅ Real-time editing  
+""")
+
+st.sidebar.markdown("---")
 
 
 def _headers():
@@ -124,11 +261,9 @@ def _headers():
     return h
 
 
-st.title("AI Resume Rebuilder — Easy Mode")
-st.markdown("A simple, step-by-step interface to extract, review, tailor, and generate ATS-friendly resumes. Follow the steps below.")
-
-# Helper to fetch session info from backend and store in session_state
+# Professional helper functions
 def fetch_session_info():
+    """Fetch session info from backend and store in session_state"""
     token = st.session_state.get('session_token')
     if not token:
         return None
@@ -143,158 +278,364 @@ def fetch_session_info():
         return None
     return None
 
-# Display current session usage if available
+def _headers():
+    """Get authorization headers for API requests"""
+    h = {}
+    # Use session token (Bearer) if available
+    if st.session_state.get('session_token'):
+        h['Authorization'] = f"Bearer {st.session_state['session_token']}"
+    return h
+
+def handle_api_error(response, operation_name="operation"):
+    """Handle API errors with user-friendly messages"""
+    if response.status_code == 401:
+        st.error("🔐 **Authentication Required**: Please refresh your session or contact support for a premium token.")
+    elif response.status_code == 429:
+        st.error("⏰ **Usage Limit Reached**: You've exceeded your free usage quota. Contact the developer for a premium token to continue using the service unlimited.")
+        st.info("💡 **Need more usage?** Scroll down to the 'About the Developer' section to get a premium token!")
+    elif response.status_code == 413:
+        st.error("📄 **File Too Large**: Please use a smaller PDF file (under 10MB).")
+    elif response.status_code == 422:
+        st.error("📋 **Invalid Data**: Please check your input and try again.")
+    elif response.status_code >= 500:
+        st.error(f"🔧 **Service Temporarily Unavailable**: Our AI service is currently experiencing issues. Please try again in a few moments.")
+    else:
+        try:
+            error_detail = response.json().get('detail', 'Unknown error')
+            st.error(f"❌ **{operation_name.title()} Failed**: {error_detail}")
+        except:
+            st.error(f"❌ **{operation_name.title()} Failed**: Status code {response.status_code}")
+
+# Show professional progress tracking
+show_progress_bar()
+
+# Enhanced session info display
 session_info = st.session_state.get('session_info') or fetch_session_info()
 
-# Show a transient toast message if set by actions (extraction/tailor/generate)
-# Toast placeholder: display one-off messages set by actions
-toast_ph = st.empty()
+# Professional toast messages using st.toast (more reliable)
 if st.session_state.get('toast_msg'):
     try:
         msg = st.session_state.pop('toast_msg')
-        toast_ph.success(msg)
+        st.toast(msg, icon="✅")
     except Exception:
         st.session_state.pop('toast_msg', None)
 
+# Professional session status display
 if session_info:
-    uses = session_info.get('uses')
-    max_uses = session_info.get('max_uses')
-    remaining = session_info.get('remaining')
-    st.info(f"Session uses: {uses}/{max_uses} — {remaining} remaining")
-    if st.button("Refresh session info", key='refresh_session'):
-        new_info = fetch_session_info()
-        if new_info:
-            st.success("Session info updated")
-        else:
-            st.error("Could not refresh session info")
+    uses = session_info.get('uses', 0)
+    max_uses = session_info.get('max_uses', 0)
+    remaining = session_info.get('remaining', 0)
+    is_admin = session_info.get('is_admin', False)
+    
+    if is_admin:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h4>🔑 Admin Session Active</h4>
+            <p>Unlimited usage • Admin privileges enabled</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h4>📊 Session Status</h4>
+            <p>Used: {uses}/{max_uses} • Remaining: {remaining} credits</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Credit usage information
+        st.markdown("""
+        <div style="background: #f8f9fa; border: 2px solid #667eea; padding: 1rem; border-radius: 8px; color: #333; margin: 0.5rem 0; font-size: 1.1em;">
+            <strong style="color: #667eea;">💡 Credit Usage:</strong> Each AI-powered step consumes 1 credit:<br>
+            • <strong>Step 1:</strong> Resume extraction & parsing (1 credit)<br>
+            • <strong>Step 3:</strong> Job-specific tailoring (1 credit)<br>
+            • <strong>Step 4:</strong> PDF generation (1 credit)<br>
+            <em style="color: #28a745;">Step 2 (editing) is free and doesn't consume credits.</em>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("🔄 Refresh Session", key='refresh_session', use_container_width=True):
+            new_info = fetch_session_info()
+            if new_info:
+                st.success("✅ Session refreshed")
+                st.rerun()
+            else:
+                st.error("❌ Could not refresh session info")
 
 
-## Step 1: Upload and extract
-st.header("Step 1 — Upload CV (PDF)")
-st.info("Upload a clean PDF of your resume. The app will extract text and try to parse contact and structured sections.")
-uploaded_file = st.file_uploader("Choose a PDF file to upload", type=["pdf"]) 
+## 📄 Step 1: Upload and Extract Resume
+st.markdown("""
+<div class="step-header">
+    <h2>📄 Step 1: Upload Your Resume (PDF)</h2>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="feature-highlight">
+    <strong>🎯 What happens next:</strong><br>
+    • AI will extract text from your PDF<br>
+    • Parse contact information automatically<br>
+    • Structure your experience and skills<br>
+    • Prepare data for ATS optimization
+</div>
+""", unsafe_allow_html=True)
+
+uploaded_file = st.file_uploader(
+    "📎 Choose your resume PDF file", 
+    type=["pdf"],
+    help="Upload a clean, well-formatted PDF of your current resume"
+) 
 
 if uploaded_file is not None:
-    # Show file info but do NOT auto-run extraction — require explicit user action
+    # Professional file info display
     try:
         size_mb = uploaded_file.size / (1024*1024)
     except Exception:
         size_mb = None
-    st.markdown(f"**Selected file:** {uploaded_file.name} ({size_mb:.2f} MB)" if size_mb else f"**Selected file:** {uploaded_file.name}")
-    if size_mb and size_mb > 10:
-        st.warning("File is larger than 10 MB — extraction may take longer or fail.")
+    
+    # File info card
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 8px; color: white; margin: 1rem 0;">
+        <h4>📋 File Ready for Processing</h4>
+        <p><strong>Filename:</strong> {uploaded_file.name}</p>
+        <p><strong>Size:</strong> {size_mb:.2f} MB</p>
+        <p><strong>Status:</strong> {'⚠️ Large file - may take longer' if size_mb and size_mb > 10 else '✅ Optimal size'}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if st.button("Extract and parse", key='extract_button'):
-        # Ensure we have a session token before calling model-backed endpoints so the server can increment usage
+    # Professional extract button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        extract_clicked = st.button(
+            "🚀 Extract & Parse Resume", 
+            key='extract_button',
+            use_container_width=True,
+            type="primary"
+        )
+    if extract_clicked:
+        # Professional session creation
         if not st.session_state.get('session_token'):
-            try:
-                sresp = requests.post(f"{backend_url}/session", data={'ttl_minutes': 60, 'max_uses': 100}, timeout=10)
-                if sresp.status_code == 200:
-                    st.session_state['session_token'] = sresp.json().get('token')
-                    # Persist token in URL query params
-                    st.experimental_set_query_params(token=st.session_state['session_token'])
-                    # populate session info immediately
-                    try:
-                        info = fetch_session_info()
-                        if info:
-                            st.session_state['session_info'] = info
-                    except Exception:
+            with st.spinner("🔧 Setting up your session..."):
+                try:
+                    sresp = requests.post(f"{backend_url}/session", data={'ttl_minutes': 60, 'max_uses': 100}, timeout=10)
+                    if sresp.status_code == 200:
+                        st.session_state['session_token'] = sresp.json().get('token')
+                        st.query_params["token"] = st.session_state['session_token']
+                        
+                        # Fetch session info
+                        try:
+                            info = fetch_session_info()
+                            if info:
+                                st.session_state['session_info'] = info
+                        except Exception:
+                            pass
+                        
+                        st.success("✅ Demo session created (100 uses available)")
+                    else:
+                        # Silently handle session creation failure
                         pass
-                    st.success("Demo session started (100 uses)")
-                else:
-                    st.info("Could not create demo session automatically; protected endpoints will require a token.")
-            except Exception:
-                st.info("Could not create demo session automatically; protected endpoints will require a token.")
+                except Exception:
+                    # Silently handle session creation failure
+                    pass
 
+        # Professional file processing
         files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
         try:
-            with st.spinner("Uploading and extracting — this may take a moment..."):
+            with st.spinner("🤖 AI is analyzing your resume... This may take 30-60 seconds"):
+                # Add progress simulation for better UX
+                progress_bar = st.progress(0)
+                for i in range(100):
+                    time.sleep(0.01)  # Simulate progress
+                    progress_bar.progress(i + 1)
+                
                 resp = requests.post(f"{backend_url}/extract-cv-json/", files=files, headers=_headers(), timeout=180)
+                progress_bar.empty()
+                
             if resp.status_code == 200:
                 data = resp.json()
                 structured = data.get("structured_data")
                 original_contact = data.get("original_contact")
                 extracted = data.get("extracted_text")
-                st.success("Extraction complete")
+                
+                # Mark step as completed
+                st.session_state['step_completed'][1] = True
+                update_progress()
+                
+                # Professional success message
+                st.markdown("""
+                <div class="success-message">
+                    🎉 Extraction Complete! Your resume has been successfully processed.
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Store extracted data
                 st.session_state['extracted_preview'] = extracted[:2000] if extracted else None
-                # populate editable text areas in session state
                 st.session_state['structured_text'] = json.dumps(structured, indent=2) if structured else None
                 st.session_state['original_text'] = json.dumps(original_contact or {}, indent=2)
 
-                # The extraction call consumed a model prompt — refresh authoritative session info, set toast, and rerun
+                # Update session info and show usage notification
                 try:
                     info = fetch_session_info()
                     if info:
                         st.session_state['session_info'] = info
-                        st.session_state['toast_msg'] = f"Session used: {info.get('uses')}/{info.get('max_uses')} — {info.get('remaining')} remaining"
-                        st.experimental_rerun()
+                        uses = info.get('uses', 0)
+                        max_uses = info.get('max_uses', 0)
+                        remaining = info.get('remaining', 0)
+                        is_admin = info.get('is_admin', False)
+                        
+                        if is_admin:
+                            st.info("🔑 **Admin Account**: You have unlimited usage!")
+                        else:
+                            if remaining > 0:
+                                st.info(f"📊 **Usage Update**: You have **{remaining} uses remaining** out of {max_uses} total.")
+                            else:
+                                st.warning("⚠️ **Usage Limit Reached**: You've used all your free attempts. Contact the developer below for premium access!")
+                        
+                        st.session_state['toast_msg'] = f"🎯 Step 1 Complete! Session: {info.get('uses')}/{info.get('max_uses')} used"
+                        st.rerun()
                 except Exception:
                     pass
             else:
-                st.error(f"Extraction failed: {resp.status_code} {resp.text}")
+                handle_api_error(resp, "resume extraction")
         except Exception as e:
-            st.error(f"Error calling backend: {e}")
+            st.error(f"🌐 **Connection Error**: Unable to connect to the AI service. Please check your internet connection and try again.")
 
 
-## Step 2: Review and edit
+## 📝 Step 2: Review and Edit Extracted Data
 st.markdown("---")
-st.header("Step 2 — Review & Edit")
-st.info("Review the parsed fields. If something is wrong, edit the contact or the structured JSON. Use the 'Validate JSON' buttons to check your edits before continuing.")
+st.markdown("""
+<div class="step-header">
+    <h2>📝 Step 2: Review & Edit Extracted Data</h2>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="feature-highlight">
+    <strong>🔍 Quality Check:</strong><br>
+    • Review AI-extracted information for accuracy<br>
+    • Edit contact details if needed<br>
+    • Validate JSON structure before proceeding<br>
+    • Ensure all important details are captured
+</div>
+""", unsafe_allow_html=True)
 
 col1, col2 = st.columns([1,1])
 with col1:
-    st.subheader("Structured data (model)")
+    st.markdown("### 🤖 AI-Extracted Structure")
     if st.session_state.get('structured_text'):
         st.json(json.loads(st.session_state['structured_text']))
-        if st.checkbox("Edit structured JSON", key="edit_structured_toggle"):
-            st.session_state['structured_text'] = st.text_area("structured_json", st.session_state['structured_text'], height=300)
-            if st.button("Validate structured JSON"):
-                try:
-                    _ = json.loads(st.session_state['structured_text'])
-                    st.success("Structured JSON is valid")
-                except Exception as e:
-                    st.error(f"Invalid JSON: {e}")
+        
+        with st.expander("✏️ Edit Structured Data", expanded=False):
+            st.markdown("**⚠️ Advanced:** Only edit if you need to correct AI extraction errors")
+            st.session_state['structured_text'] = st.text_area(
+                "Structured JSON Data", 
+                st.session_state['structured_text'], 
+                height=300,
+                help="This contains your experience, skills, and education data"
+            )
+            
+            col_validate1, col_validate2 = st.columns([1, 1])
+            with col_validate1:
+                if st.button("✅ Validate Structure", key="validate_structured"):
+                    try:
+                        json.loads(st.session_state['structured_text'])
+                        st.success("✅ Valid JSON structure!")
+                        st.session_state['step_completed'][2] = True
+                        update_progress()
+                    except Exception as e:
+                        st.error(f"❌ Invalid JSON: {e}")
     else:
-        st.info("No structured data yet — upload a PDF in Step 1.")
+        st.info("🔄 No structured data yet — complete Step 1 first.")
 
 with col2:
-    st.subheader("Original contact (editable)")
+    st.markdown("### 📞 Contact Information")
     if st.session_state.get('original_text'):
-        st.json(json.loads(st.session_state['original_text']))
-        st.session_state['original_text'] = st.text_area("original_contact_json", st.session_state['original_text'], height=300)
-        if st.button("Validate contact JSON"):
-            try:
-                _ = json.loads(st.session_state['original_text'])
-                st.success("Contact JSON is valid")
-            except Exception as e:
-                st.error(f"Invalid JSON: {e}")
+        contact_data = json.loads(st.session_state['original_text'])
+        st.json(contact_data)
+        
+        with st.expander("✏️ Edit Contact Details", expanded=True):
+            st.markdown("**📝 Common edits:** Update phone, email, or LinkedIn URL")
+            st.session_state['original_text'] = st.text_area(
+                "Contact JSON Data", 
+                st.session_state['original_text'], 
+                height=300,
+                help="Your contact information (name, email, phone, etc.)"
+            )
+            
+            col_validate3, col_validate4 = st.columns([1, 1])
+            with col_validate3:
+                if st.button("✅ Validate Contact", key="validate_contact"):
+                    try:
+                        json.loads(st.session_state['original_text'])
+                        st.success("✅ Valid contact JSON!")
+                    except Exception as e:
+                        st.error(f"❌ Invalid JSON: {e}")
     else:
-        st.info("No contact data yet — upload a PDF in Step 1.")
+        st.info("🔄 No contact data yet — complete Step 1 first.")
 
 
-## Step 3: Optional — Tailor to a job description
+## 🎯 Step 3: Job-Specific Tailoring (Optional)
 st.markdown("---")
-st.header("Step 3 — Tailor to a job description (optional)")
-st.info("Paste the job description and choose a rewrite style. The model will return tailored summary/skills/experience sections. You can edit the tailored output before generating the final CV.")
+st.markdown("""
+<div class="step-header">
+    <h2>🎯 Step 3: Tailor to Job Description (Optional)</h2>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="feature-highlight">
+    <strong>🚀 ATS Optimization:</strong><br>
+    • Paste target job description<br>
+    • AI will optimize keywords and phrases<br>
+    • Tailored content improves ATS scores<br>
+    • Skip this step for general-purpose resume
+</div>
+""", unsafe_allow_html=True)
 
 with st.form(key='tailor_form'):
-    job_description = st.text_area("Job description (paste here)", height=200)
-    rewrite_style = st.selectbox("Rewrite style", ["keywords", "minimal", "full"], index=0)
-    tailor_submit = st.form_submit_button("Tailor JSON to ATS")
+    st.markdown("### 📋 Job Description")
+    job_description = st.text_area(
+        "Paste the job description here", 
+        height=200,
+        placeholder="Copy and paste the full job description from the company's posting...",
+        help="The more detailed the job description, the better the AI can tailor your resume"
+    )
+    
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        rewrite_style = st.selectbox(
+            "🎨 Tailoring Style", 
+            ["keywords", "minimal", "full"], 
+            index=0,
+            help="Keywords: Focus on matching key terms | Minimal: Light adjustments | Full: Comprehensive rewrite"
+        )
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        tailor_submit = st.form_submit_button(
+            "🎯 Tailor Resume with AI", 
+            use_container_width=True,
+            type="primary"
+        )
 
 if tailor_submit:
     if not st.session_state.get('structured_text'):
-        st.error("No structured data available — please upload and validate a CV first.")
+        st.error("❌ No structured data available — please complete Step 1 first.")
     else:
+        # Validate structured data
         try:
             cv_json = json.loads(st.session_state['structured_text'])
         except Exception as e:
-            st.error(f"Structured JSON is invalid: {e}")
+            st.error(f"❌ Structured JSON is invalid: {e}")
             cv_json = None
+        
+        # Validate contact data    
         try:
             orig_contact_obj = json.loads(st.session_state['original_text']) if st.session_state.get('original_text') else None
         except Exception:
             orig_contact_obj = None
+        
         if cv_json is not None:
             payload = {
                 "cv_json": json.dumps(cv_json),
@@ -302,140 +643,396 @@ if tailor_submit:
                 "rewrite_style": rewrite_style,
                 "original_contact": json.dumps(orig_contact_obj) if orig_contact_obj else None
             }
+            
             try:
-                with st.spinner("Calling tailoring model — this may take a bit..."):
+                with st.spinner("🤖 AI is tailoring your resume... This may take 45-90 seconds"):
+                    # Progress bar for better UX
+                    progress_bar = st.progress(0)
+                    for i in range(100):
+                        time.sleep(0.02)
+                        progress_bar.progress(i + 1)
+                    
                     resp = requests.post(f"{backend_url}/tailor-json-to-ats/", data=payload, headers=_headers(), timeout=180)
+                    progress_bar.empty()
+                    
                 if resp.status_code == 200:
                     result = resp.json()
                     tailored = result.get('tailored_data') or result.get('tailored') or {}
-                    st.success("Tailoring complete — review below")
+                    
+                    # Mark step as completed
+                    st.session_state['step_completed'][3] = True
+                    update_progress()
+                    
+                    st.markdown("""
+                    <div class="success-message">
+                        🎉 Tailoring Complete! Your resume has been optimized for this specific job.
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                     st.session_state['tailored_text'] = json.dumps(tailored, indent=2)
-                    st.subheader("Tailored output (preview)")
-                    st.json(tailored)
-                    # refresh session info so uses/max_uses reflect this call; show toast and rerun to update banner
+                    
+                    with st.expander("📊 View Tailored Results", expanded=True):
+                        st.json(tailored)
+                    
+                    # Update session info and show usage notification
                     try:
                         info = fetch_session_info()
                         if info:
                             st.session_state['session_info'] = info
-                            st.session_state['toast_msg'] = f"Session used: {info.get('uses')}/{info.get('max_uses')} — {info.get('remaining')} remaining"
-                            st.experimental_rerun()
+                            uses = info.get('uses', 0)
+                            max_uses = info.get('max_uses', 0)
+                            remaining = info.get('remaining', 0)
+                            is_admin = info.get('is_admin', False)
+                            
+                            if is_admin:
+                                st.info("🔑 **Admin Account**: You have unlimited usage!")
+                            else:
+                                if remaining > 0:
+                                    st.info(f"📊 **Usage Update**: You have **{remaining} uses remaining** out of {max_uses} total.")
+                                else:
+                                    st.warning("⚠️ **Usage Limit Reached**: You've used all your free attempts. Contact the developer below for premium access!")
+                            
+                            # Show immediate toast notification
+                            st.toast(f"🎯 Step 3 Complete! {uses}/{max_uses} uses consumed", icon="✅")
+                            st.session_state['toast_msg'] = f"🎯 Step 3 Complete! Session: {info.get('uses')}/{info.get('max_uses')} used"
                     except Exception:
                         pass
                 else:
-                    st.error(f"Tailoring failed: {resp.status_code} {resp.text}")
+                    handle_api_error(resp, "resume tailoring")
             except Exception as e:
-                st.error(f"Error calling backend: {e}")
+                st.error(f"🌐 **Connection Error**: Unable to connect to the AI service. Please check your internet connection and try again.")
 
-    
+# Tailored content editing section
 if st.session_state.get('tailored_text'):
-    st.subheader("Editable Tailored JSON")
-    st.session_state['tailored_text'] = st.text_area("tailored_json", st.session_state['tailored_text'], height=300)
-    if st.button("Validate tailored JSON"):
-        try:
-            _ = json.loads(st.session_state['tailored_text'])
-            st.success("Tailored JSON is valid")
-        except Exception as e:
-            st.error(f"Invalid JSON: {e}")
+    st.markdown("### ✏️ Fine-tune Tailored Content")
+    with st.expander("📝 Edit Tailored JSON (Optional)", expanded=False):
+        st.markdown("**💡 Tip:** You can make final adjustments to the AI-tailored content")
+        st.session_state['tailored_text'] = st.text_area(
+            "Tailored JSON Data", 
+            st.session_state['tailored_text'], 
+            height=300,
+            help="The AI-tailored version of your resume data"
+        )
+        if st.button("✅ Validate Tailored JSON", key="validate_tailored"):
+            try:
+                json.loads(st.session_state['tailored_text'])
+                st.success("✅ Tailored JSON is valid!")
+            except Exception as e:
+                st.error(f"❌ Invalid JSON: {e}")
 
-
-## Step 4: Generate final CV
+## 📄 Step 4: Generate Professional PDF
 st.markdown("---")
-st.header("Step 4 — Generate final CV (PDF)")
-st.info("Choose which data to use for final generation and click Generate. The server will produce a downloadable PDF.")
+st.markdown("""
+<div class="step-header">
+    <h2>📄 Step 4: Generate Professional PDF</h2>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="feature-highlight">
+    <strong>🎨 Final Output:</strong><br>
+    • Choose your preferred data source<br>
+    • Generate ATS-optimized PDF format<br>
+    • Download ready-to-submit resume<br>
+    • Professional formatting applied automatically
+</div>
+""", unsafe_allow_html=True)
 
 with st.form(key='generate_form'):
-    choice = st.radio("Use data from:", ("Edited tailored JSON", "Tailored JSON", "Structured JSON"))
-    gen_submit = st.form_submit_button("Generate Final PDF")
+    st.markdown("### 📊 Choose Data Source")
+    
+    # Smart default selection based on available data
+    default_choice = 0
+    if st.session_state.get('tailored_text'):
+        default_choice = 0  # Tailored
+    elif st.session_state.get('structured_text'):
+        default_choice = 2  # Structured
+    
+    choice = st.radio(
+        "Select the data version to use for PDF generation:",
+        ("🎯 Tailored Data (Recommended)", "📝 Edited Tailored Data", "📋 Original Structured Data"),
+        index=default_choice,
+        help="Tailored data is optimized for ATS systems and specific job requirements"
+    )
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        gen_submit = st.form_submit_button(
+            "🚀 Generate Professional PDF", 
+            use_container_width=True,
+            type="primary"
+        )
 
 if gen_submit:
-    # pick data source
+    # Determine data source based on choice
     use_obj = None
-    if choice == "Edited tailored JSON" and st.session_state.get('tailored_text'):
+    data_source = ""
+    
+    if choice == "📝 Edited Tailored Data" and st.session_state.get('tailored_text'):
         try:
             use_obj = json.loads(st.session_state['tailored_text'])
+            data_source = "edited tailored"
         except Exception as e:
-            st.error(f"Edited tailored JSON is invalid: {e}")
-    elif choice == "Tailored JSON" and st.session_state.get('tailored_text'):
+            st.error(f"❌ Edited tailored JSON is invalid: {e}")
+    elif choice == "🎯 Tailored Data (Recommended)" and st.session_state.get('tailored_text'):
         try:
             use_obj = json.loads(st.session_state['tailored_text'])
+            data_source = "tailored"
         except:
             use_obj = None
-    elif choice == "Structured JSON" and st.session_state.get('structured_text'):
+    elif choice == "📋 Original Structured Data" and st.session_state.get('structured_text'):
         try:
             use_obj = json.loads(st.session_state['structured_text'])
+            data_source = "structured"
         except Exception as e:
-            st.error(f"Structured JSON is invalid: {e}")
+            st.error(f"❌ Structured JSON is invalid: {e}")
 
     if use_obj is None:
-        st.error("No valid data available for generation. Please validate your JSON first.")
+        st.error("❌ No valid data available for generation. Please validate your JSON first.")
     else:
+        # Prepare contact data
         try:
             orig_contact_obj = json.loads(st.session_state['original_text']) if st.session_state.get('original_text') else None
         except Exception:
             orig_contact_obj = None
+            
         payload = {
             "tailored_json": json.dumps({"tailored_data": use_obj, "original_contact": orig_contact_obj})
         }
         if orig_contact_obj:
             payload['original_contact'] = json.dumps(orig_contact_obj)
+            
         try:
-            with st.spinner("Generating PDF on server — this may take a moment..."):
+            with st.spinner(f"🎨 Generating professional PDF from {data_source} data... This may take 30-45 seconds"):
+                # Progress simulation
+                progress_bar = st.progress(0)
+                for i in range(100):
+                    time.sleep(0.01)
+                    progress_bar.progress(i + 1)
+                
                 resp = requests.post(f"{backend_url}/generate-final-cv/", data=payload, headers=_headers(), timeout=180)
+                progress_bar.empty()
 
             if resp.status_code == 200:
                 result = resp.json()
                 download_link = result.get('download_link')
+                
                 if download_link:
+                    # Mark final step as completed
+                    st.session_state['step_completed'][4] = True
+                    update_progress()
+                    
+                    st.markdown("""
+                    <div class="success-message">
+                        🎉 PDF Generated Successfully! Your professional resume is ready for download.
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                     full_url = backend_url.rstrip('/') + download_link
-                    st.success("CV generated")
-                    st.markdown(f"[Download final PDF]({full_url})")
-                    try:
-                        r = requests.get(full_url, timeout=60)
-                        if r.status_code == 200:
-                            st.download_button("Download PDF", data=r.content, file_name="Final_ATS_CV.pdf", mime="application/pdf")
-                        else:
-                            st.info("Could not fetch PDF for inline download; use the download link above")
-                    except Exception:
-                        st.info("Could not fetch PDF for inline download; use the download link above")
-                    # refresh session info after generation
+                    
+                    # Download options
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        st.markdown(f"🔗 **[Download PDF from Server]({full_url})**")
+                    
+                    with col2:
+                        try:
+                            r = requests.get(full_url, timeout=60)
+                            if r.status_code == 200:
+                                st.download_button(
+                                    "⬇️ Download PDF File", 
+                                    data=r.content, 
+                                    file_name="Professional_Resume_ATS.pdf", 
+                                    mime="application/pdf",
+                                    use_container_width=True
+                                )
+                            else:
+                                st.info("💡 Use the download link above to get your PDF")
+                        except Exception:
+                            st.info("💡 Use the download link above to get your PDF")
+                    
+                    # Update session info and show final usage notification
                     try:
                         info = fetch_session_info()
                         if info:
                             st.session_state['session_info'] = info
-                            st.session_state['toast_msg'] = f"Session used: {info.get('uses')}/{info.get('max_uses')} — {info.get('remaining')} remaining"
-                            st.experimental_rerun()
+                            uses = info.get('uses', 0)
+                            max_uses = info.get('max_uses', 0)
+                            remaining = info.get('remaining', 0)
+                            is_admin = info.get('is_admin', False)
+                            
+                            if is_admin:
+                                st.info("🔑 **Admin Account**: You have unlimited usage for future resumes!")
+                            else:
+                                if remaining > 0:
+                                    st.info(f"🎉 **Success!** You have **{remaining} uses remaining** for creating more resumes.")
+                                else:
+                                    st.warning("⚠️ **All Uses Consumed**: You've used all your free attempts. Contact the developer below for premium access to create more resumes!")
+                            
+                            # Show immediate toast notification
+                            st.toast(f"🎉 Resume Complete! {uses}/{max_uses} uses consumed", icon="🎉")
+                            st.session_state['toast_msg'] = f"🎉 Resume Complete! Session: {info.get('uses')}/{info.get('max_uses')} used"
                     except Exception:
                         pass
                 else:
-                    st.error(f"No download link returned: {result}")
+                    st.error(f"❌ No download link returned from service")
             else:
-                st.error(f"Generation failed: {resp.status_code} {resp.text}")
+                handle_api_error(resp, "PDF generation")
         except Exception as e:
-            st.error(f"Error calling backend: {e}")
+            st.error(f"🌐 **Connection Error**: Unable to connect to the AI service. Please check your internet connection and try again.")
 
 
+# Professional footer and session controls
 st.markdown("---")
-#st.info("Tips: make sure your FastAPI server is running locally on http://localhost:8000. Install dependencies: streamlit, requests.")
 
-# Session controls
+## 👨‍💻 About the Developer
+st.markdown("""
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 15px; color: white; margin: 2rem 0;">
+    <div style="text-align: center;">
+        <h2>👨‍💻 Meet the Developer</h2>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    try:
+        st.image("me.jpg", width=250, caption="Dhafer Souid")
+    except:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); padding: 2rem; border-radius: 10px; text-align: center; color: white;">
+            <h3>👨‍💻 Dhafer Souid</h3>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # 3D Avatar Model below the photo
+    try:
+        with open("model3.glb", "rb") as f:
+            model_data = f.read()
+        
+        st.markdown("""
+        <div style="text-align: center; margin: 1.5rem 0;">
+            <h3 style="color: #667eea; margin-bottom: 0.5rem;">👋 Hey, That's Me!</h3>
+            <p style="color: #666; font-size: 1.1em; margin-bottom: 1rem;">🎯 Interactive 3D Avatar - Drag to move </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Display 3D model using HTML with model-viewer (bigger size)
+        st.components.v1.html(f"""
+        <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+        <div style="display: flex; justify-content: center; align-items: center; height: 400px;">
+            <model-viewer 
+                src="data:model/gltf-binary;base64,{__import__('base64').b64encode(model_data).decode()}"
+                alt="Dhafer Souid 3D Avatar"
+                auto-rotate
+                autoplay
+                camera-controls
+                style="width: 320px; height: 320px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);"
+                exposure="1.2"
+                shadow-intensity="1.5">
+            </model-viewer>
+        </div>
+        <div style="text-align: center; margin-top: 1rem;">
+            <p style="color: #667eea; font-weight: bold; font-size: 1em;">📞 Ready to collaborate? Let's connect!</p>
+            <small style="color: #666;">🖱️ Click and drag to rotate • Scroll to zoom</small>
+        </div>
+        """, height=450)
+        
+    except Exception as e:
+        # If 3D model fails, just show a placeholder
+        st.markdown("""
+        <div style="text-align: center; margin: 1rem 0; padding: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white;">
+            <p>🎯 3D Avatar Loading...</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown("""
+    ### 🎓 Dhafer Souid
+    **Fresh Graduate | Software Developer**
+    
+    Hi! I'm Dhafer, a passionate fresh graduate who built this AI Resume Rebuilder to help job seekers create ATS-optimized resumes using cutting-edge AI technology.
+    
+    #### 🚀 What I Do:
+    - **AI Development**: Building intelligent applications that solve real-world problems
+    - **Software Development**: Creating end-to-end solutions with modern technologies
+    - **Resume Optimization**: Helping professionals stand out in competitive job markets
+    
+    #### 💡 About This Project:
+    This application demonstrates expertise in:
+    - **AI Integration**: Seamless AI-powered text processing and optimization
+    - **User Experience**: Modern, intuitive interface design
+    - **Cloud Solutions**: Scalable deployment and session management
+    
+    ---
+    
+    ### 🌟 Want More Usage?
+    
+    **Need unlimited access or premium features?**
+    
+    If you find this tool valuable and want extended usage beyond the free tier, I'd be happy to provide you with a **premium user token** for unlimited resume processing.
+    
+    📧 **Contact me for premium access:**
+    - **Email**: [Contact Dhafer](mailto:dhafer.souid@example.com)
+    - **LinkedIn**: Connect with me for professional opportunities
+    - **GitHub**: Check out my other projects and contributions
+    
+    💼 *I'm also open to freelance projects and full-time opportunities!*
+    """)
+
+st.markdown("""
+<div class="feature-highlight" style="text-align: center; margin: 2rem 0;">
+    <h3>🎉 Thank You for Using AI Resume Rebuilder!</h3>
+    <p>Your feedback and success stories motivate me to keep improving this tool.</p>
+    <p><strong>💡 Pro Tip:</strong> Bookmark this page and share it with friends who need resume help!</p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div style="text-align: center; padding: 2rem; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white; margin: 2rem 0;">
+    <h3>🎉 Congratulations!</h3>
+    <p>You've created a professional, ATS-optimized resume using AI technology.</p>
+    <p><strong>💡 Pro Tips:</strong> Save this URL with your session token to return later | Share with friends | Use for multiple job applications</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Enhanced sidebar session controls
 st.sidebar.markdown("---")
-st.sidebar.subheader("Session")
-# Admin helper: paste an admin token and activate it for this session
-admin_token_input = st.sidebar.text_input("Admin token (paste here)", type="password")
-if st.sidebar.button("Use admin token"):
+st.sidebar.markdown("""
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 8px; color: white; margin: 1rem 0;">
+    <h4>🔑 Premium User Access(more usages)</h4>
+</div>
+""", unsafe_allow_html=True)
+
+admin_token_input = st.sidebar.text_input(
+    "🔐 Premium user Token", 
+    type="password",
+    placeholder="Paste admin token here...",
+    help="Admin tokens provide unlimited usage"
+)
+
+if st.sidebar.button(" Activate Premium user Token", use_container_width=True):
     if admin_token_input:
         st.session_state['session_token'] = admin_token_input
-        st.experimental_set_query_params(token=st.session_state['session_token'])
-        # refresh session info into session_state
+        st.query_params["token"] = st.session_state['session_token']
+        
+        # Refresh session info
         info = fetch_session_info()
         if info and info.get('is_admin'):
-            st.sidebar.success("Admin session active — quota bypass enabled")
+            st.sidebar.success("✅ Admin session activated!")
+            st.sidebar.balloons()
         else:
-            st.sidebar.warning("Token set but not recognized as admin or session-info unavailable")
+            st.sidebar.warning("⚠️ Token not recognized as admin")
     else:
-        st.sidebar.info("Paste an admin token first")
+        st.sidebar.error("❌ Please enter a token first")
 
-
-
-# Helpful notes
-#st.info("Tips: run your FastAPI server locally on http://localhost:8000 and then use this Streamlit app to interact with it. Install dependencies: streamlit, requests.")
+# Professional footer
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+<div style="text-align: center; color: #666; font-size: 0.8em;">
+    <p>🤖 <strong>AI Resume Rebuilder</strong></p>
+    <p>Powered by AI • Professional Results</p>
+    <p>© 2025 | Built with ❤️ and Streamlit</p>
+</div>
+""", unsafe_allow_html=True)
