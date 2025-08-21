@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional styling
+# Custom CSS for professional styling with mobile-only optimizations
 st.markdown("""
 <style>
     /* Hide Streamlit's top menu and footer */
@@ -22,21 +22,9 @@ st.markdown("""
     #stDecoration {display:none;}
     header {visibility: hidden;}
     
+    /* Desktop styles remain unchanged */
     .main-header {
-        background: linear-gradient(90de                                             if is_admin:
-                                st.info("🔑 **Admin Account**: You have unlimited usage!")
-                            else:
-                                if remaining > 0:
-                                    st.info(f"📊 **Usage Update**: You have **{remaining} uses remaining** out of {max_uses} total.")
-                                else:
-                                    st.warning("⚠️ **Usage Limit Reached**: You've used all your free attempts. Contact the developer below for premium access!")
-                            
-                            # Show immediate toast notification
-                            st.toast(f"🎯 Step 1 Complete! {uses}/{max_uses} uses consumed", icon="✅")
-                            st.session_state['toast_msg'] = f"🎯 Step 1 Complete! Session: {info.get('uses')}/{info.get('max_uses')} used"info:
-                            st.session_state['session_info'] = info
-                            st.session_state['toast_msg'] = f"🎯 Step 1 Complete! Session: {info.get('uses')}/{info.get('max_uses')} used"
-                            st.rerun()667eea 0%, #764ba2 100%);
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
         padding: 2rem 0;
         border-radius: 10px;
         margin-bottom: 2rem;
@@ -63,21 +51,18 @@ st.markdown("""
         background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
         transition: width 0.3s ease;
     }
-    .stats-card {h
+    .stats-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 1rem;
         border-radius: 10px;
         color: white;
         text-align: center;
         margin: 0.5rem 0;
-        
     }
     .feature-highlight {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 1rem;
         border-radius: 8px;
-        color: white;
-        margin: 1rem 0;
     }
     .success-message {
         background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
@@ -88,6 +73,136 @@ st.markdown("""
     }
     .sidebar .sidebar-content {
         background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* MOBILE-ONLY STYLES - These only apply to mobile devices */
+    @media (max-width: 768px) {
+        /* Black background for mobile */
+        .stApp {
+            background-color: #000000 !important;
+        }
+        .main .block-container {
+            background-color: #000000 !important;
+        }
+        
+        /* White text for mobile readability */
+        .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, 
+        .stApp div, .stApp span, .stApp label, .stMarkdown {
+            color: #ffffff !important;
+        }
+        
+        /* File uploader mobile styling */
+        .stFileUploader label, .stFileUploader div, .stFileUploader span {
+            color: #ffffff !important;
+        }
+        .stFileUploader [data-testid="stFileUploaderDropzone"] {
+            background-color: #333333 !important;
+            border: 2px dashed #cccccc !important;
+            color: #ffffff !important;
+        }
+        
+        /* Info/Warning/Success messages for mobile */
+        .stInfo, .stInfo div, .stInfo p {
+            background-color: rgba(102, 126, 234, 0.3) !important;
+            color: #ffffff !important;
+        }
+        .stWarning, .stWarning div, .stWarning p {
+            background-color: rgba(255, 193, 7, 0.3) !important;
+            color: #ffffff !important;
+        }
+        .stSuccess, .stSuccess div, .stSuccess p {
+            background-color: rgba(40, 167, 69, 0.3) !important;
+            color: #ffffff !important;
+        }
+        
+        /* Input fields for mobile */
+        .stTextInput > div > div > input, .stTextArea > div > div > textarea {
+            background-color: #333333 !important;
+            color: #ffffff !important;
+            border: 1px solid #666666 !important;
+        }
+        .stTextInput label, .stTextArea label {
+            color: #ffffff !important;
+        }
+        
+        /* Buttons for mobile */
+        .stButton > button {
+            background-color: #667eea !important;
+            color: #ffffff !important;
+            border: none !important;
+        }
+        
+        /* Sidebar for mobile */
+        .css-1d391kg {
+            background-color: #222222 !important;
+        }
+        
+        /* Make header text more mobile-friendly */
+        .main-header {
+            padding: 1.5rem 1rem !important;
+            font-size: 0.9em !important;
+        }
+        
+        /* Smaller padding for cards on mobile */
+        .stats-card, .feature-highlight {
+            padding: 0.75rem !important;
+            margin: 0.5rem 0 !important;
+        }
+    }
+    
+    /* FIX FOR BUTTON VISIBILITY ISSUES - DESKTOP AND MOBILE */
+    
+    /* Desktop button fixes */
+    @media (min-width: 769px) {
+        /* File uploader button */
+        .stFileUploader button {
+            background-color: #667eea !important;
+            color: white !important;
+            border: 1px solid #667eea !important;
+        }
+        
+        /* Selectbox (dropdown) styling */
+        .stSelectbox > div > div {
+            background-color: white !important;
+            color: #333333 !important;
+            border: 1px solid #cccccc !important;
+        }
+        
+        /* All buttons general styling */
+        .stButton > button {
+            background-color: #667eea !important;
+            color: white !important;
+            border: 1px solid #667eea !important;
+        }
+        
+        /* Ensure selectbox text is visible */
+        .stSelectbox label {
+            color: #333333 !important;
+        }
+    }
+    
+    /* Mobile button fixes */
+    @media (max-width: 768px) {
+        /* File uploader button */
+        .stFileUploader button {
+            background-color: #667eea !important;
+            color: white !important;
+            border: 1px solid #667eea !important;
+        }
+        
+        /* Selectbox (dropdown) styling for mobile */
+        .stSelectbox > div > div {
+            background-color: #333333 !important;
+            color: white !important;
+            border: 1px solid #666666 !important;
+        }
+        
+        /* All buttons for mobile */
+        .stButton > button {
+            background-color: #667eea !important;
+            color: white !important;
+            border: 1px solid #667eea !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -102,7 +217,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Fixed backend URL (not editable in UI for normal users)
-backend_url = "https://d8ac6766cc1190.lhr.life"
+backend_url = "https://d9953fb1b50eaf.lhr.life"
 
 # Restore session token from URL query parameters on app load
 query_params = st.query_params
@@ -974,8 +1089,8 @@ with col2:
     If you find this tool valuable and want extended usage beyond the free tier, I'd be happy to provide you with a **premium user token** for unlimited resume processing.
     
     📧 **Contact me for premium access:**
-    - **Email**: [Contact Dhafer](mailto:dhafer.souid@example.com)
-    - **LinkedIn**: Connect with me for professional opportunities
+    - **Email**: [dhafer.souid@esprit.tn](mailto:dhafer.souid@esprit.tn)
+    - **LinkedIn**: [Connect with Dhafer Souid](https://www.linkedin.com/in/dhafer-souid-46b88b11b)
     - **GitHub**: Check out my other projects and contributions
     
     💼 *I'm also open to freelance projects and full-time opportunities!*
