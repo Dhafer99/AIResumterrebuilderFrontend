@@ -236,6 +236,127 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# LocalStorage session management functions
+def init_session_from_storage():
+    """Initialize session from localStorage using JavaScript"""
+    st.components.v1.html("""
+    <script>
+    // Function to get session data from localStorage
+    function getSessionFromStorage() {
+        const sessionData = localStorage.getItem('ai_resume_session');
+        if (sessionData) {
+            try {
+                return JSON.parse(sessionData);
+            } catch (e) {
+                console.error('Error parsing session data:', e);
+                localStorage.removeItem('ai_resume_session');
+            }
+        }
+        return null;
+    }
+    
+    // Function to save session data to localStorage
+    function saveSessionToStorage(sessionData) {
+        try {
+            localStorage.setItem('ai_resume_session', JSON.stringify(sessionData));
+        } catch (e) {
+            console.error('Error saving session data:', e);
+        }
+    }
+    
+    // Function to clear session data
+    function clearSessionStorage() {
+        localStorage.removeItem('ai_resume_session');
+    }
+    
+    // Function to check if session is expired
+    function isSessionExpired(sessionData) {
+        if (!sessionData.expires_at) return false;
+        return new Date() > new Date(sessionData.expires_at);
+    }
+    
+    // Function to send session data to Streamlit
+    function sendSessionToStreamlit() {
+        const sessionData = getSessionFromStorage();
+        if (sessionData && !isSessionExpired(sessionData)) {
+            // Send to Streamlit via query params
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.get('token')) {
+                urlParams.set('token', sessionData.token);
+                const newUrl = window.location.pathname + '?' + urlParams.toString();
+                window.history.replaceState({}, '', newUrl);
+            }
+            
+            // Trigger a custom event that Streamlit can listen to
+            window.dispatchEvent(new CustomEvent('sessionRestored', {
+                detail: sessionData
+            }));
+        }
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        sendSessionToStreamlit();
+    });
+    
+    // Run immediately if DOM is already loaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sendSessionToStreamlit);
+    } else {
+        sendSessionToStreamlit();
+    }
+    </script>
+    """, height=0)
+
+def save_session_to_storage(session_token, session_info=None):
+    """Save session data to localStorage using JavaScript"""
+    session_data = {
+        'token': session_token,
+        'timestamp': time.time(),
+        'expires_at': None
+    }
+    
+    if session_info:
+        session_data.update({
+            'uses': session_info.get('uses', 0),
+            'max_uses': session_info.get('max_uses', 0),
+            'remaining': session_info.get('remaining', 0),
+            'is_admin': session_info.get('is_admin', False),
+            'expires_at': session_info.get('expires_at')
+        })
+    
+    st.components.v1.html(f"""
+    <script>
+    function saveSession() {{
+        const sessionData = {json.dumps(session_data)};
+        try {{
+            localStorage.setItem('ai_resume_session', JSON.stringify(sessionData));
+            console.log('Session saved to localStorage:', sessionData);
+        }} catch (e) {{
+            console.error('Error saving session:', e);
+        }}
+    }}
+    saveSession();
+    </script>
+    """, height=0)
+
+def clear_session_storage():
+    """Clear session data from localStorage"""
+    st.components.v1.html("""
+    <script>
+    localStorage.removeItem('ai_resume_session');
+    console.log('Session cleared from localStorage');
+    </script>
+    """, height=0)
+
+def get_session_from_storage():
+    """Get session data from localStorage via query params"""
+    # First check query params (set by JavaScript)
+    query_params = st.query_params
+    if "token" in query_params:
+        return query_params["token"]
+    return None
+
 # Professional header
 st.markdown("""
 <div class="main-header">
@@ -265,7 +386,8 @@ def _init_state():
         'tailored_text': None,
         'extracted_preview': None,
         'step_completed': {1: False, 2: False, 3: False, 4: False},
-        'progress_percentage': 0
+        'progress_percentage': 0,
+        'session_from_storage': False
     }.items():
         if key not in st.session_state:
             st.session_state[key] = val
@@ -317,34 +439,57 @@ except Exception:
     pass
 
 def _create_initial_session_if_missing():
-    """Try to create a demo session once when the user first opens the app.
-
-    This avoids the problem where the first protected call runs before a session exists.
-    If the backend is unreachable we mark initialization done so we don't spam requests.
-    """
+    """Try to restore session from localStorage first, then create a demo session if needed."""
+    
+    # First, try to restore from localStorage via JavaScript
+    if not st.session_state.get('session_from_storage'):
+        init_session_from_storage()
+        st.session_state['session_from_storage'] = True
+    
+    # Check if we got a token from localStorage (via query params)
+    storage_token = get_session_from_storage()
+    if storage_token and not st.session_state.get('session_token'):
+        st.session_state['session_token'] = storage_token
+        # Fetch session info for this token
+        info = fetch_session_info()
+        if info:
+            st.session_state['session_info'] = info
+            # Check if session is still valid (not expired and has remaining uses)
+            if not info.get('is_admin', False) and info.get('remaining', 0) <= 0:
+                st.warning("⚠️ **Stored Session Exhausted**: Your saved session has no remaining credits. Creating a new demo session...")
+                # Clear the exhausted session
+                clear_session_storage()
+                st.session_state['session_token'] = None
+                st.session_state['session_info'] = None
+            else:
+                st.session_state['session_initialized'] = True
+                return
+    
+    # If we have a valid session token, don't create a new one
     if st.session_state.get('session_token'):
         st.session_state['session_initialized'] = True
         return
+    
+    # If initialization already attempted, don't try again
     if st.session_state.get('session_initialized'):
         return
+    
+    # Create a new demo session
     try:
-        # short timeout so page load isn't blocked for long if backend down
-        # request a larger demo quota so new users won't exhaust the session immediately
         sresp = requests.post(f"{backend_url}/session", data={'ttl_minutes': 60, 'max_uses': 4}, timeout=4)
         if sresp.status_code == 200:
-            st.session_state['session_token'] = sresp.json().get('token')
-            # fetch authoritative session info (uses / remaining) and store it
-            try:
-                info = fetch_session_info()
-                if info:
-                    st.session_state['session_info'] = info
-            except Exception:
-                pass
+            token = sresp.json().get('token')
+            st.session_state['session_token'] = token
+            
+            # Fetch session info and save to localStorage
+            info = fetch_session_info()
+            if info:
+                st.session_state['session_info'] = info
+                save_session_to_storage(token, info)
+                st.success("✅ New demo session created and saved!")
     except Exception:
-        # ignore errors here; we just don't have a session yet
         pass
     finally:
-        # mark initialized (whether success or not) to avoid repeated attempts
         st.session_state['session_initialized'] = True
 
 
@@ -407,7 +552,7 @@ def _headers():
 
 # Professional helper functions
 def fetch_session_info():
-    """Fetch session info from backend and store in session_state"""
+    """Fetch session info from backend and store in session_state and localStorage"""
     token = st.session_state.get('session_token')
     if not token:
         return None
@@ -417,6 +562,8 @@ def fetch_session_info():
         if resp.status_code == 200:
             info = resp.json()
             st.session_state['session_info'] = info
+            # Save updated session info to localStorage
+            save_session_to_storage(token, info)
             return info
     except Exception:
         return None
@@ -564,18 +711,20 @@ if uploaded_file is not None:
                 try:
                     sresp = requests.post(f"{backend_url}/session", data={'ttl_minutes': 60, 'max_uses': 100}, timeout=10)
                     if sresp.status_code == 200:
-                        st.session_state['session_token'] = sresp.json().get('token')
-                        st.query_params["token"] = st.session_state['session_token']
+                        token = sresp.json().get('token')
+                        st.session_state['session_token'] = token
+                        st.query_params["token"] = token
                         
-                        # Fetch session info
+                        # Fetch session info and save to localStorage
                         try:
                             info = fetch_session_info()
                             if info:
                                 st.session_state['session_info'] = info
+                                save_session_to_storage(token, info)
                         except Exception:
                             pass
                         
-                        st.success("✅ Demo session created (100 uses available)")
+                        st.success("✅ Demo session created and saved to browser!")
                     else:
                         # Silently handle session creation failure
                         pass
@@ -1156,20 +1305,62 @@ admin_token_input = st.sidebar.text_input(
     help="Admin tokens provide unlimited usage"
 )
 
-if st.sidebar.button(" Activate Premium user Token", use_container_width=True):
+if st.sidebar.button("🔑 Activate Premium Token", use_container_width=True):
     if admin_token_input:
         st.session_state['session_token'] = admin_token_input
-        st.query_params["token"] = st.session_state['session_token']
         
-        # Refresh session info
+        # Fetch session info to validate the token
         info = fetch_session_info()
         if info and info.get('is_admin'):
-            st.sidebar.success("✅ Admin session activated!")
+            st.session_state['session_info'] = info
+            # Save admin session to localStorage
+            save_session_to_storage(admin_token_input, info)
+            st.query_params["token"] = admin_token_input
+            st.sidebar.success("✅ Admin session activated and saved!")
             st.sidebar.balloons()
         else:
             st.sidebar.warning("⚠️ Token not recognized as admin")
+            # Clear invalid token from storage
+            clear_session_storage()
     else:
         st.sidebar.error("❌ Please enter a token first")
+
+# Session Management Section
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem; border-radius: 8px; color: white; margin: 1rem 0;">
+    <h4>💾 Session Management</h4>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    if st.button("🔄 Refresh", use_container_width=True):
+        info = fetch_session_info()
+        if info:
+            st.success("✅ Session updated!")
+            st.rerun()
+
+with col2:
+    if st.button("🗑️ Clear Session", use_container_width=True):
+        clear_session_storage()
+        st.session_state['session_token'] = None
+        st.session_state['session_info'] = None
+        st.query_params.clear()
+        st.success("✅ Session cleared!")
+        st.rerun()
+
+# Show session storage status
+if st.session_state.get('session_info'):
+    info = st.session_state['session_info']
+    storage_status = "💾 Saved in browser" if st.session_state.get('session_token') else "⚠️ Not saved"
+    st.sidebar.markdown(f"""
+    <div style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px; font-size: 0.8em; margin: 0.5rem 0;">
+        <strong>Storage:</strong> {storage_status}<br>
+        <strong>Type:</strong> {'Admin' if info.get('is_admin') else 'Demo'}<br>
+        <strong>Credits:</strong> {info.get('remaining', 0)} remaining
+    </div>
+    """, unsafe_allow_html=True)
 
 # Professional footer
 st.sidebar.markdown("---")
