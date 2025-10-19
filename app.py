@@ -148,6 +148,45 @@ st.markdown("""
             padding: 0.75rem !important;
             margin: 0.5rem 0 !important;
         }
+        
+        /* FIX FOR EXTRACTED TEXT AND JSON DISPLAY ON MOBILE */
+        /* JSON viewer styling for mobile - dark background with light text */
+        .stJson, .stJson div, .stJson pre, .stJson code {
+            background-color: #1e1e1e !important;
+            color: #d4d4d4 !important;
+            border: 1px solid #444444 !important;
+        }
+        
+        /* Expander content on mobile */
+        .streamlit-expanderContent {
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+        }
+        
+        /* Code blocks and preformatted text */
+        pre, code {
+            background-color: #1e1e1e !important;
+            color: #d4d4d4 !important;
+            padding: 0.5rem !important;
+            border-radius: 4px !important;
+        }
+        
+        /* Text areas with JSON or extracted content */
+        .stTextArea textarea {
+            background-color: #1e1e1e !important;
+            color: #d4d4d4 !important;
+            border: 1px solid #444444 !important;
+        }
+        
+        /* Ensure all content containers have proper background */
+        [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"] {
+            background-color: transparent !important;
+        }
+        
+        /* Fix for any remaining white backgrounds in content areas */
+        .element-container, .stMarkdown, .stText {
+            background-color: transparent !important;
+        }
     }
     
     /* FIX FOR BUTTON VISIBILITY ISSUES - DESKTOP AND MOBILE */
